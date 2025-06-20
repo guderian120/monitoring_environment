@@ -1,0 +1,26 @@
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'andyprojects7@gmail.com'
+  smtp_auth_username: 'andyprojects7@gmail.com'
+  smtp_auth_password: 'ifho cyae dpin cwew'
+  smtp_require_tls: true
+
+route:
+  group_by: ['alertname']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 1h
+  receiver: 'team-notifications'
+
+receivers:
+- name: 'team-notifications'
+  slack_configs:
+  - api_url: 'https://hooks.slack.com/services/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'
+    channel: '#alerts'
+    send_resolved: true
+    title: '{{ .CommonAnnotations.summary }}'
+    text: '{{ .CommonAnnotations.description }}'
+  email_configs:
+  - to: 'realandyamponsah10@gmail.com'
+    send_resolved: true

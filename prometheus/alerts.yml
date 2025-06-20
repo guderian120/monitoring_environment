@@ -1,0 +1,83 @@
+groups:
+- name: monitoring
+  rules:
+  - alert: HighCPUUsage
+    expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High CPU usage on {{ $labels.instance }}"
+      description: "{{ $labels.instance }} has CPU usage above 80% for 5 minutes."
+  - alert: ContainerDown
+    expr: absent(container_cpu_usage_seconds_total)
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Container is down"
+      description: "A container has been down for more than 1 minute."
+  - alert: ContainerStarted
+    expr: time() - container_start_time_seconds > 0 and time() - container_start_time_seconds < 60
+    for: 0s
+    labels:
+      severity: info
+    annotations:
+      summary: "Container {{ $labels.name }} started on {{ $labels.instance }}"
+      description: "Container {{ $labels.name }} was started at {{ $value | humanizeTimestamp }}."
+  - alert: HighMemoryUsage
+    expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High memory usage on {{ $labels.instance }}"
+      description: "{{ $labels.instance }} has memory usage above 85% for 5 minutes."
+  - alert: LowDiskSpace
+    expr: (node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes * 100 > 90
+    for: 10m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Low disk space on {{ $labels.instance }}"
+      description: "{{ $labels.instance }} has less than 10% free disk space on {{ $labels.mountpoint }}."
+  - alert: HighNetworkIO
+    expr: rate(node_network_receive_bytes_total[5m]) * 8 > 100000000 or rate(node_network_transmit_bytes_total[5m]) * 8 > 100000000
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High network I/O on {{ $labels.instance }}"
+      description: "{{ $labels.instance }} has network traffic above 100 Mbps for 5 minutes."
+  - alert: ServiceDown
+    expr: up == 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Service {{ $labels.job }} down on {{ $labels.instance }}"
+      description: "{{ $labels.job }} on {{ $labels.instance }} has been unreachable for 5 minutes."
+  - alert: ContainerRestart
+    expr: changes(container_start_time_seconds[5m]) > 0
+    for: 0s
+    labels:
+      severity: warning
+    annotations:
+      summary: "Container {{ $labels.name }} restarted on {{ $labels.instance }}"
+      description: "Container {{ $labels.name }} restarted at {{ $value | humanizeTimestamp }}."
+  - alert: ContainerHighCPU
+    expr: sum(rate(container_cpu_usage_seconds_total[5m])) by (name) * 100 > 90
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High container CPU usage for {{ $labels.name }}"
+      description: "Container {{ $labels.name }} has CPU usage above 90% for 5 minutes."
+  - alert: ContainerHighMemory
+    expr: container_memory_usage_bytes / 1024 / 1024 / 1024 > 0.5
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High container memory usage for {{ $labels.name }}"
+      description: "Container {{ $labels.name }} is using more than 500 MB of memory for 5 minutes."
