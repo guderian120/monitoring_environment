@@ -10,8 +10,7 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-    ports:
-      - "9090:9090"
+  
     networks:
       - monitoring
     restart: unless-stopped
@@ -27,8 +26,7 @@ services:
       - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
       - '--path.rootfs=/host/root'
-    ports:
-      - "9100:9100"
+ 
     networks:
       - monitoring
     restart: unless-stopped
@@ -41,8 +39,7 @@ services:
       - /var/run:/var/run:rw
       - /sys:/sys:ro
         # - /var/lib/docker/:/var/lib/docker:ro
-    ports:
-      - "8080:8080"
+  
     networks:
       - monitoring
     restart: unless-stopped

@@ -1,387 +1,250 @@
 # Monitoring Project Documentation
 
 ## Overview
-This project sets up a robust monitoring solution using **Prometheus** and **Grafana** to monitor a server running multiple Docker containers and the host operating system. Metrics from the host (CPU, memory, disk) and containers (resource usage, health) are collected, visualized in Grafana dashboards, and monitored with alerting mechanisms via Alertmanager. The setup uses Docker Compose to manage services, ensuring easy deployment and scalability.
+This project sets up a modern monitoring solution using **Prometheus** and **Grafana** to monitor a server running multiple Docker containers and the host operating system. Metrics from the host (CPU, memory, disk) and containers (resource usage, health) are collected, visualized in Grafana dashboards, and monitored with alerting mechanisms via Alertmanager. The setup uses Docker Compose to manage services, ensuring easy deployment and scalability.
 
----
+# Prometheus & Grafana Monitoring Environment
 
-## Project Components
-- **Prometheus**: A time-series database that collects and stores metrics from configured targets.
-- **Node Exporter**: Exposes host OS metrics (e.g., CPU, memory, disk usage).
-- **cAdvisor**: Monitors Docker container metrics (e.g., CPU, memory, network).
-- **Grafana**: Visualizes metrics through customizable dashboards and supports alerting.
-- **Alertmanager**: Handles alerts from Prometheus, sending notifications (e.g., via Slack or email).
+![Monitoring Dashboard](screenshots/dashboard-overview.png) *Example of monitoring dashboard in Grafana*
 
-## Architecture
-- **Prometheus** scrapes metrics from:
-  - Itself (`localhost:9090`)
-  - Node Exporter (`node-exporter:9100`)
-  - cAdvisor (`cadvisor:8080`)
-- **Grafana** connects to Prometheus as a data source for visualization.
-- **Alertmanager** receives alerts from Prometheus and sends notifications to configured receivers (e.g., Slack).
-- All services run as Docker containers on a shared `monitoring` network.
+## Table of Contents
+- [Architecture Overview](#architecture-overview)
+- [Setup Instructions](#setup-instructions)
+- [Assessment Questions & Answers](#assessment-questions--answers)
+- [Screenshots](#screenshots)
+- [Configuration Files](#configuration-files)
 
-## Prerequisites
-- **Server**: Ubuntu 22.04 LTS (or similar Linux distribution).
-- **Software**:
-  - Docker: `sudo apt install docker.io`
-  - Docker Compose: `sudo apt install docker-compose`
-- **Ports**:
-  - Prometheus: 9090
-  - Grafana: 3000
-  - Node Exporter: 9100
-  - cAdvisor: 8080
-  - Alertmanager: 9093
-- **Disk Space**: At least 10GB for Prometheus and Grafana data volumes.
+## Architecture Overview
 
-## Directory Structure
-The project uses the following structure:
-```
-monitoring-project
-├── docker-compose.yml
-├── prometheus
-│   ├── prometheus.yml
-│   └── alerts.yml
-├── grafana
-│   └── grafana.ini
-└── alertmanager
-    └── alertmanager.yml
-```
-
-### Creating the Directory Structure
-Run the following script to set up the directory structure:
-
-```bash
-#!/bin/bash
-PROJECT_DIR="monitoring-project"
-mkdir -p "$PROJECT_DIR"/{prometheus,grafana,alertmanager}
-touch "$PROJECT_DIR"/{docker-compose.yml,prometheus/prometheus.yml,prometheus/alerts.yml,grafana/grafana.ini,alertmanager/alertmanager.yml}
-chmod -R 755 "$PROJECT_DIR"
-chmod 644 "$PROJECT_DIR"/{docker-compose.yml,prometheus/*,grafana/*,alertmanager/*}
-echo "Directory structure created at $PROJECT_DIR"
-```
-
-Save as `setup_directory_structure.sh`, make executable (`chmod +x setup_directory_structure.sh`), and run (`./setup_directory_structure.sh`).
-
-## Configuration Files
-
-### 1. Docker Compose (`docker-compose.yml`)
-Defines services for Prometheus, Node Exporter, cAdvisor, Grafana, and Alertmanager.
-
-```yaml
-version: '3.8'
-services:
-  prometheus:
-    image: prom/prometheus:v2.47.0
-    container_name: prometheus
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml
-      - prometheus_data:/prometheus
-    command: 
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-    ports:
-      - "9090:9090"
-    networks:
-      - monitoring
-    restart: unless-stopped
-
-  node-exporter:
-    image: prom/node-exporter:v1.6.1
-    container_name: node-exporter
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/host/root:ro
-    command:
-      - '--path.procfs=/host/proc'
-      - '--path.sysfs=/host/sys'
-      - '--path.rootfs=/host/root'
-    ports:
-      - "9100:9100"
-    networks:
-      - monitoring
-    restart: unless-stopped
-
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.47.0
-    container_name: cadvisor
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:rw
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-    ports:
-      - "8080:8080"
-    networks:
-      - monitoring
-    restart: unless-stopped
-
-  grafana:
-    image: grafana/grafana:10.1.0
-    container_name: grafana
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/grafana.ini:/etc/grafana/grafana.ini
-    ports:
-      - "3000:3000"
-    networks:
-      - monitoring
-    restart: unless-stopped
-
-  alertmanager:
-    image: prom/alertmanager:v0.25.0
-    container_name: alertmanager
-    volumes:
-      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
-    ports:
-      - "9093:9093"
-    networks:
-      - monitoring
-    restart: unless-stopped
-
-volumes:
-  prometheus_data:
-  grafana_data:
-
-networks:
-  monitoring:
-    driver: bridge
-```
-
-### 2. Prometheus Configuration (`prometheus/prometheus.yml`)
-Configures Prometheus to scrape metrics and send alerts to Alertmanager.
-
-```yaml
-global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
-
-alerting:
-  alertmanagers:
-    - static_configs:
-        - targets:
-            - alertmanager:9093
-
-rule_files:
-  - "alerts.yml"
-
-scrape_configs:
-  - job_name: 'prometheus'
-    static_configs:
-      - targets: ['localhost:9090']
-  - job_name: 'node-exporter'
-    static_configs:
-      - targets: ['node-exporter:9100']
-  - job_name: 'cadvisor'
-    static_configs:
-      - targets: ['cadvisor:8080']
-```
-
-### 3. Prometheus Alert Rules (`prometheus/alerts.yml`)
-Defines alerts for high CPU usage and container downtime.
-
-```yaml
-groups:
-- name: example
-  rules:
-  - alert: HighCPUUsage
-    expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
-    for: 5m
-    labels:
-      severity: warning
-    annotations:
-      summary: "High CPU usage detected on {{ $labels.instance }}"
-      description: "{{ $labels.instance }} has CPU usage above 80% for 5 minutes."
-  - alert: ContainerDown
-    expr: absent(container_cpu_usage_seconds_total)
-    for: 1m
-    labels:
-      severity: critical
-    annotations:
-      summary: "Container is down"
-      description: "A container has been down for more than 1 minute."
-```
-
-### 4. Alertmanager Configuration (`alertmanager/alertmanager.yml`)
-Configures Alertmanager to send notifications (e.g., via Slack).
-
-```yaml
-global:
-  resolve_timeout: 5m
-
-route:
-  group_by: ['alertname']
-  group_wait: 30s
-  group_interval: 5m
-  repeat_interval: 1h
-  receiver: 'slack'
-
-receivers:
-- name: 'slack'
-  slack_configs:
-  - api_url: 'https://hooks.slack.com/services/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'
-    channel: '#alerts'
-    send_resolved: true
-    title: '{{ .CommonAnnotations.summary }}'
-    text: '{{ .CommonAnnotations.description }}'
-```
-
-**Note**: Replace the Slack webhook URL with your actual URL or configure an alternative receiver (e.g., email).
-
-### 5. Grafana Configuration (`grafana/grafana.ini`)
-Customizes Grafana settings, such as disabling anonymous access.
-
-```ini
-[auth]
-disable_login_form = false
-disable_signout_menu = false
-
-[auth.anonymous]
-enabled = false
-
-[security]
-allow_embedding = true
+```mermaid
+graph TD
+    subgraph Docker Host
+        A[Prometheus Container] -->|Scrape Metrics| B(Node Exporter Container)
+        A -->|Scrape Metrics| C(Cadvisor Container)
+        D[Grafana Container] -->|Query Data| A
+        E[Alertmanager Container] -->|Receive Alerts| A
+        F[Custom Network<br>prometheus-grafana] --- A
+        F --- B
+        F --- C
+        F --- D
+        F --- E
+    end
+    
+    subgraph Host System
+        B -->|Collect Metrics| H1((/proc))
+        B -->|Collect Metrics| H2((/sys))
+        B -->|Collect Metrics| H3((/))
+        V1[Prometheus Data Volume] --- A
+        V2[Grafana Data Volume] --- D
+    end
+    
+    G[Web Browser] -->|Access Dashboards| D
+    G -->|Access UI| A
 ```
 
 ## Setup Instructions
-1. **Create Directory Structure**:
-   - Run the `setup_directory_structure.sh` script (see above) to create the directory structure.
-   - Copy the configuration files into their respective directories.
 
-2. **Deploy the Monitoring Stack**:
-   - Navigate to the project directory: `cd monitoring-project`
-   - Start services: `docker-compose up -d`
-   - Verify containers are running: `docker ps`
+### Prerequisites
+- Docker Engine 20.10+
+- Docker Compose 2.12+
+- 4GB RAM minimum
+- 2 CPU cores minimum
 
-3. **Access Services**:
-   - **Prometheus**: `http://<server-ip>:9090`
-   - **Grafana**: `http://<server-ip>:3000` (default login: admin/admin)
-   - **Alertmanager**: `http://<server-ip>:9093`
-   - **Node Exporter**: `http://<server-ip>:9100`
-   - **cAdvisor**: `http://<server-ip>:8080`
+### Installation Steps
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/guderian120/monitoring_environment.git
+   cd monitoring_environment
+   ```
 
-## Configuring Grafana
-### Adding Prometheus as a Data Source
-1. Log in to Grafana (`http://<server-ip>:3000`).
-2. Navigate to **Configuration > Data Sources** (gear icon in the sidebar).
-3. Click **Add data source** and select **Prometheus**.
-4. Configure the data source:
-   - **Name**: `Prometheus`
-   - **URL**: Use `http://prometheus:9090` (container name, preferred for Docker networking) instead of `http://localhost:9090`.
-   - **Access**: Set to `Server (default)`.
-5. Click **Save & Test**. A green “Data source is working” message confirms success.
-6. **Note**: If `localhost:9090` fails (e.g., due to Docker network isolation), using the container name (`prometheus:9090`) ensures Grafana resolves the Prometheus service within the `monitoring` network.
+2. Start the monitoring stack:
+   ```bash
+   docker compose up -d
+   ```
 
-### Importing Dashboards
-1. Go to **Dashboards > Import**.
-2. Import pre-built dashboards:
-   - **Node Exporter Dashboard**: ID `1860` (host metrics).
-   - **cAdvisor Dashboard**: ID `14282` (container metrics).
-3. Select the `Prometheus` data source and save.
-4. Customize dashboards as needed for specific metrics (e.g., container memory usage).
+3. Access the services:
+   - Prometheus: http://localhost:9090
+   - Grafana: http://localhost:3000 (admin/admin)
+   - Node Exporter: http://localhost:9100/metrics
+   - cAdvisor: http://localhost:8080/metrics
 
-### Setting Up Grafana Alerts
-1. Open a dashboard and edit a panel (e.g., for container memory usage).
-2. Add an alert rule:
-   - **Query**: `container_memory_usage_bytes / container_memory_limit_bytes * 100`
-   - **Condition**: `> 80` (alert if memory usage exceeds 80%).
-   - **Evaluate every**: `1m`, **For**: `5m`.
-3. Configure a notification channel:
-   - Go to **Alerting > Notification channels**.
-   - Add a Slack or email channel, matching the Alertmanager receiver settings.
-4. Save the alert and test by simulating high memory usage (e.g., `stress --vm 2 --vm-bytes 512M`).
+4. Configure Grafana:
+   - Add Prometheus data source: http://prometheus:9090
+   - Import dashboards from `grafana/dashboards/`
 
-## Alerting Setup
-- **Prometheus Alerts**: Defined in `alerts.yml` (e.g., `HighCPUUsage`, `ContainerDown`).
-- **Alertmanager**: Sends notifications to the configured receiver (e.g., Slack).
-- **Testing Alerts**:
-  - Simulate high CPU usage: `stress --cpu 4 --timeout 600`
-  - Check Prometheus alerts: `http://<server-ip>:9090/alerts`
-  - Verify Alertmanager: `http://<server-ip>:9093/#/alerts`
-  - Confirm notifications in the Slack channel (or other receiver).
+## Assessment Questions & Answers
 
-## Maintenance
-- **Backup**: Regularly back up `prometheus_data` and `grafana_data` volumes:
-  ```bash
-  docker volume ls
-  tar -czf prometheus_data_backup.tar.gz /var/lib/docker/volumes/monitoring-project_prometheus_data
-  tar -czf grafana_data_backup.tar.gz /var/lib/docker/volumes/monitoring-project_grafana_data
-  ```
-- **Updates**: Update Docker images:
-  ```bash
-  docker-compose pull && docker-compose up -d
-  ```
-- **Scaling**: Add exporters for other applications (e.g., MySQL Exporter) by extending `docker-compose.yml` and `prometheus.yml`.
+### Section 1: Architecture and Setup Understanding
 
-## Security Considerations
-- Restrict port access using a firewall (e.g., `ufw allow 3000,9090,9093,9100,8080`).
-- Enable HTTPS for Grafana and Alertmanager in production.
-- Use strong passwords for Grafana (update via `grafana.ini` or admin settings).
+#### Question 1: Container Orchestration Analysis
+the Node Exporter needs those host mounts (/proc, /sys, /) typically because it should be able to access the host's actual system files to get real metrics. Like /proc has all the process  and kernel info, "/sys" has device details, and "/" gives filesystem access. If I didn't mount these, the container would just see its own environment, which is not what we want in this case. Without these mounts, we will lose visibility into CPu usage, memory stats, disk space and basically everything important. 
+this setup shows how containerized monitoring should work, we keep the monitoring agent separate from apps, but give it just enough access to do its job. And we make the mounts read-only where possible for security. Pretty elegant and simple solution actually.
 
-## Troubleshooting
-### General Issues
-- **Container Not Starting**:
-  - Check logs: `docker logs <container-name>`
-  - Verify `docker-compose.yml` syntax: `docker-compose config`
-  - Ensure sufficient disk space: `df -h`
-- **Prometheus Not Scraping Metrics**:
-  - Check targets: `http://<server-ip>:9090/targets`
-  - Verify container connectivity: `docker exec prometheus curl http://node-exporter:9100/metrics`
-  - Ensure `prometheus.yml` targets use container names (e.g., `node-exporter:9100`).
-- **Alerts Not Firing**:
-  - Verify alert rules: `http://<server-ip>:9090/alerts`
-  - Check PromQL query in Prometheus UI: `100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)`
-  - Lower threshold for testing (e.g., `> 50` in `alerts.yml`) and reload: `curl -X POST http://<server-ip>:9090/-/reload`
-- **Notifications Not Sent**:
-  - Check Alertmanager logs: `docker logs alertmanager`
-  - Validate `alertmanager.yml`: `docker run -v $(pwd)/alertmanager/alertmanager.yml:/alertmanager.yml prom/alertmanager amtool check-config /alertmanager.yml`
-  - Test Slack webhook: `curl -X POST -d '{"text":"Test"}' <your-slack-webhook-url>`
+#### Question 2: Network Security Implications
+That custom network "prometheus-grafana" is a better choice over the default Docker network. It not only isolates our monitoring environment from other environments which is good security practice but also ensures our host ports remain closed while giving containers ability to communicate with each other.The port exposure is a security risk ports 3000 and 9093 was the only opened port on my host, because the containers could access resources from each other in the prometheus-network. I tried to configure a reverse proxy such that we can at least have encryption in transit, however the time afforded for the task wasn't sufficient enough
 
-### Adding Prometheus Data Source in Grafana
-If you encounter issues adding Prometheus as a data source in Grafana:
-1. **Problem**: `localhost:9090` fails with a connection error.
-   - **Cause**: Docker containers run in isolated networks, and `localhost` may not resolve to the Prometheus container.
-   - **Solution**: Use the container name and port: `http://prometheus:9090`.
-     - In Grafana’s data source settings, set **URL** to `http://prometheus:9090`.
-     - The `monitoring` network in `docker-compose.yml` ensures containers can communicate by name.
-2. **Problem**: “Data source is not working” after saving.
-   - **Cause**: Network issues, incorrect URL, or Prometheus container not running.
-   - **Solution**:
-     - Verify Prometheus is running: `docker ps | grep prometheus`
-     - Test connectivity from Grafana container: `docker exec grafana curl http://prometheus:9090`
-     - Check Grafana logs: `docker logs grafana`
-3. **Problem**: Metrics not appearing in Grafana dashboards.
-   - **Cause**: Incorrect PromQL queries or mismatched data source.
-   - **Solution**:
-     - Ensure dashboards use the `Prometheus` data source (check dashboard settings).
-     - Validate queries in Prometheus UI first (e.g., `node_cpu_seconds_total`).
-     - Re-import dashboards (IDs: 1860 for Node Exporter, 14282 for cAdvisor).
+If I was setting this up for real, I'd:
+- Put everything behind a reverse proxy like Nginx
+- Add proper authentication (maybe OAuth or something)
+- Only expose the proxy port, not all these internal ports
+- Maybe even use VPN for admin access
+Oh and encrypt the traffic with TLS for sure. The current setup is fine for lab but way too open for production.
 
-## Stress Testing
-To test alerts:
-1. Install `stress`: `sudo apt install stress`
-2. Simulate high CPU usage: `stress --cpu 4 --timeout 600`
-3. Monitor:
-   - Prometheus: `http://<server-ip>:9090/graph` (query CPU metrics)
-   - Alertmanager: `http://<server-ip>:9093/#/alerts` (check `HighCPUUsage`)
-   - Slack: Verify notification in the configured channel
-4. Stop stress test: Ctrl+C or wait for timeout.
+#### Question 3: Data Persistence Strategy
+Looking at the compose file, Prometheus uses a named volume for its data directory while Grafana has its own volume for configs. Smart because they have different needs - Prometheus is handling tons of time-series writes while Grafana is storing dashboard configs mostly. 
 
-## Zipping the Project for Backup or Sharing
-To create a compressed archive of the `monitoring-project` folder:
+If you removed these volumes? Oh man disaster - all your historical metrics gone for Prometheus. For Grafana you'd lose all your dashboards and settings. Learned that the hard way when I accidentally deleted volumes during testing. Had to rebuild everything from scratch - not fun! So yeah persistence is crucial.
+
+### Section 2: Metrics and Query Understanding
+
+#### Question 4: PromQL Logic Breakdown
+That uptime query `node_time_seconds - node_boot_time_seconds` is pretty clever actually. `node_boot_time_seconds` is when the system last started, `node_time_seconds` is current time. Subtract them and you get seconds since boot. 
+
+But it's not perfect - if the system clock drifts or gets adjusted, your uptime calculation could be wrong. Also doesn't account for when the system was down for maintenance but the clock kept running. 
+
+I might use `time() - node_boot_time_seconds` instead sometimes. It uses Prometheus server time which is usually more reliable, especially if you have multiple servers in different timezones. But both have their uses depending on what exactly you need.
+
+#### Question 5: Memory Metrics Deep Dive
+So why do we use `MemTotal - MemAvailable` instead of `MemFree`? Good question - I wondered that too when I first saw it. Turns out "free" memory in Linux isn't the whole story. The system uses spare memory for caching and buffers, which it can free up when needed.
+
+`MemAvailable` includes that reclaimable memory, so it gives a truer picture of actual available memory. If you just look at `MemFree`, you might panic thinking memory is almost full when really there's plenty available in caches. This way we avoid false alerts during heavy operations.
+
+#### Question 6: Filesystem Query Analysis
+That filesystem query `1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)` is calculating used percentage by taking the available fraction and subtracting from 1. Simple but effective for root mount.
+
+Problem is if you have multiple mounts it'll return multiple values which could mess up your dashboard. Also it might include temp filesystems like tmpfs which you don't care about. 
+
+I'd modify it by adding a filter like `fstype!="tmpfs"` and maybe aggregate with `avg()` if you want a single value. Also should specify the mountpoint properly - saw it misspelled as "monutpoint" in the question, typo I assume?
+
+### Section 3: Visualization and Dashboard Design
+
+#### Question 7: Visualization Type Justification
+For the uptime display, they used a Stat panel - makes sense cause it's a single number you want to see at a glance. Time series for CPU was right choice cause you need to see how it changes over time. The Gauge for disk usage is perfect cause it shows how close you are to limits.
+
+But I think they could've used better colors in the gauge - red at 80% might be too aggressive for some systems. Also the time series graph could use some smoothing during my testing it was pretty jittery. Overall good choices but always room for improvement.
+
+#### Question 8: Threshold Configuration Strategy
+The 80% disk threshold is pretty standard - gives you warning before things get critical. But in real world it depends so much on the system. Like for a database server I'd set lower threshold maybe 70% cause they fill up fast and performance tanks when disks get full.
+
+A better approach would be tiered alerts:
+- 80% = warning notification
+- 90% = critical alert to admins
+- 95% = page the on-call engineer
+
+Also should consider growth rate - if a disk is growing 10% per day, 80% is more urgent than if it's stable. I'd implement this in Alertmanager with different severity levels and escalation paths.
+
+#### Question 9: Dashboard Variable Implementation
+The $job variable in Grafana is super useful - lets you filter dashboards by job name. Behind the scenes it's basically a dropdown that inserts values into queries. When you have multiple values it runs the query for each combination.
+
+But if you're not careful it can break things. Like if you have a variable with thousands of values, your dashboard might timeout trying to load all options. Or if you select incompatible variables the queries return no data. 
+
+To test robustness I'd try selecting weird combinations, empty values, special characters. Also test with large numbers of options to see if performance suffers.
+
+### Section 4: Production and Scalability Considerations
+
+#### Question 10: Resource Planning for 100 Servers
+Okay for 100 servers we need to scale up significantly. From my testing each server generates about 1,000 metrics at 15s intervals. So that's 100 * 1000 = 100,000 metrics every 15 seconds - about 6,700 samples per second.
+
+For storage, assuming 2.5 bytes per sample, that's about 16.5MB per minute or 24GB per day. For 30 days retention we'd need at least 720GB storage. 
+
+CPU and memory - Prometheus docs suggest 4 cores and 16GB RAM for this load but I'd go higher to be safe. First bottleneck would probably be disk I/O - SSDs are a must. Also might need to shard Prometheus instances if we scale further.
+
+#### Question 11: High Availability Design
+For HA I'd run multiple Prometheus instances scraping the same targets - active/active setup. They'd write to shared storage like S3 or a distributed filesystem. For Alertmanager I'd run 3 instances in a cluster so they can deduplicate alerts.
+
+Grafana can be scaled horizontally since it's stateless - just put a load balancer in front. Need to make sure all instances use the same database backend though.
+
+The trade-off is complexity - managing this distributed system is way harder than a single node. But for production you need the reliability. Also costs more obviously with multiple instances.
+
+#### Question 12: Security Hardening Analysis
+Biggest vulnerabilities I saw:
+1. No authentication on Prometheus/Alertmanager
+2. Plain HTTP everywhere
+3. Containers running as root
+4. No network segmentation
+5. Grafana with default admin password
+
+How I'd fix:
+- Add authentication everywhere (OAuth or basic auth)
+- Setup TLS for all communications
+- Run containers as non-root users
+- Put monitoring in separate VLAN
+- Use secrets management for credentials
+- Enable Grafana security features
+
+### Section 5: Troubleshooting and Operations
+
+#### Question 13: Debugging DOWN Targets
+When a target shows DOWN in Prometheus, here's how I troubleshoot:
+First check the Prometheus UI for error messages - often tells you exactly what's wrong. Then I'd `docker compose logs prometheus` to see if there's clues. 
+
+Next I'd try to curl the endpoint manually from the Prometheus container:
 ```bash
-zip -r monitoring-project.zip monitoring-project
+docker compose exec prometheus curl http://node-exporter:9100/metrics
 ```
-Verify contents: `unzip -l monitoring-project.zip`
+If that fails, check DNS resolution with `nslookup node-exporter`. If DNS works but connection fails, might be firewall issue. 
 
-## Extensibility
-- Add exporters for specific applications (e.g., `mysql-exporter` for MySQL databases).
-- Integrate additional notification channels (e.g., PagerDuty, email).
-- Customize Grafana dashboards for application-specific metrics.
+Most common causes I've seen:
+- Exporter service down (restart it)
+- Network misconfiguration (check compose file)
+- Firewall blocking (disable or open ports)
+- Resource exhaustion (check container stats)
 
-## Conclusion
-This monitoring setup provides a scalable, production-ready solution for tracking server and container performance. Regularly monitor dashboards, test alerts, and back up data to ensure reliability. For further assistance, consult the troubleshooting section or contact the system administrator.
+#### Question 14: Performance Optimization
+Some queries can be real resource hogs - anything with heavy aggregations or regex matching. Like that filesystem query with multiple mountpoints could be expensive at scale.
 
-*Last Updated: June 19, 2025*
+To optimize:
+- Use recording rules for frequent queries
+- Avoid unnecessary aggregations
+- Set proper query time ranges
+- Increase scrape intervals where possible
+
+Also in Grafana:
+- Use dashboard refresh intervals wisely
+- Avoid querying huge time ranges
+- Use template variables to limit scope
+
+And definitely monitor Prometheus itself - track its resource usage and query performance. Funny how the monitoring system needs monitoring too!
+
+#### Question 15: Capacity Planning Scenario
+When Prometheus disk usage grows uncontrollably, first I'd check:
+- Retention period (maybe set too long)
+- Number of metrics being scraped
+- Scrape interval too frequent
+- Cardinality explosion from labels
+
+For retention policy, it depends on business needs - maybe 15 days for operational dashboards but 1 year for business metrics. Can't keep everything forever though.
+
+I'd implement data lifecycle management:
+- Short-term high-res storage (30 days)
+- Long-term downsampled storage (1 year)
+- Archive cold data to object storage
+- Automate cleanup of old data
+
+Tricky balance between keeping enough history and not wasting resources. Always some compromise needed.
+
+## Screenshots
+
+1. **Docker Containers Running**  
+   ![Docker Compose Status](screenshots/docker-compose-ps.png)
+
+2. **Prometheus Targets Status**  
+   ![Prometheus Targets](screenshots/prometheus-targets.png)
+
+3. **Grafana Dashboard Panels**  
+   ![Dashboard Panels](screenshots/grafana-dashboards.png)
+
+4. **Grafana Data Source Configuration**  
+   ![Data Sources](screenshots/grafana-datasources.png)
+
+5. **Dashboard Variable Configuration**  
+   ![Variables](screenshots/grafana-variables.png)
+
+## Configuration Files
+
+All configuration files are available in the repository:
+
+- [Docker Compose](docker-compose.yml)
+- [Prometheus Configuration](prometheus/prometheus.yml)
+- [Alertmanager Configuration](alertmanager/alertmanager.yml)
+- [Grafana Provisioning](grafana/provisioning/)
