@@ -16,7 +16,9 @@ This project sets up a modern monitoring solution using **Prometheus** and **Gra
 - [Configuration Files](#configuration-files)
 
 ## Architecture Overview
+![Architecture](media/architecture.png)
 
+## Interactive Architecture view
 ```mermaid
 graph TD
     subgraph Docker Host
