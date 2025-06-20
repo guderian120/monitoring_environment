@@ -233,6 +233,12 @@ I will implement data lifecycle management:
 5. **Dashboard Variable Configuration**  
    ![Variables](media/dashboard_variable_setup.png)
 
+6. **Slack Notification**  
+   ![Variables](media/sample_slack_alert.png)
+
+7. **Email Notification**  
+   ![Variables](media/sample_email_alert.png)
+
 ## Configuration Files
 
 All configuration files are available in the repository:
@@ -240,4 +246,4 @@ All configuration files are available in the repository:
 - [Docker Compose](docker-compose.yml)
 - [Prometheus Configuration](prometheus/prometheus.yml)
 - [Alertmanager Configuration](alertmanager/alertmanager.yml)
-- [Grafana Provisioning](grafana/provisioning/)
+- [Grafana Provisioning](grafana/grafana.ini/)
